@@ -1,0 +1,8 @@
+# Test addresses for small range testing
+# These are NOT the real puzzle addresses - just for build/smoke testing
+
+1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+1BoatSLRHtKNngkdXEeobR76b53LETtpyT
+1JfbZRwdDHKZmuiZgYArJZhcuuzuw2HuMu
+1EHNa6Q4Jz2uvNExL497mE43ikXhwF6kZm
+1Pizza1Bitcoin1111111111Y3DJwX
