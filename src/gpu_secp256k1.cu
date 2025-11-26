@@ -273,7 +273,8 @@ __device__ void sha256(uint8_t* hash, const uint8_t* data, uint32_t len) {
 }
 
 // RIPEMD160 constants and functions
-#define ROTL32_RMD(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
+// Include the hash functions header
+#include "gpu_hash_functions.cuh"
 
 __device__ __constant__ uint32_t RMD_K_LEFT[5] = {
     0x00000000, 0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xA953FD4E

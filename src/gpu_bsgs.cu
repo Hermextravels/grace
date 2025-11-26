@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "gpu_solver.h"
+#include "gpu_hash_functions.cuh"
 #include <math.h>
 
 // 256-bit unsigned integer (8 x 32-bit limbs)
