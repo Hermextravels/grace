@@ -275,6 +275,7 @@ void hybrid_solve_puzzle(int puzzle_num, const std::string& start_hex,
         uint64_t total_checked = 0;
         auto start_time = std::chrono::steady_clock::now();
 
+        uint8_t found_key[32];
         while (mpz_cmp(current_key, end_key) < 0 && !state->should_stop) {
             // Export current key to bytes
             uint8_t start_bytes[32] = {0};
