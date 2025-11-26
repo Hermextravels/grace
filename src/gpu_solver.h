@@ -9,6 +9,12 @@
 extern "C" {
 #endif
 
+// Device hash function prototypes (for CUDA kernels)
+#ifdef __CUDACC__
+__device__ void sha256(uint8_t* hash, const uint8_t* data, uint32_t len);
+__device__ void ripemd160(uint8_t* hash, const uint8_t* data, uint32_t len);
+#endif
+
 // Initialize GPU and CUDA constants
 void gpu_init_constants();
 
