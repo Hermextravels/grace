@@ -46,32 +46,26 @@ GMP_LIBS = $(shell pkg-config --libs gmp 2>/dev/null || echo "-lgmp")
 SECP256K1_FLAGS = -I/usr/local/include
 SECP256K1_LIBS = -L/usr/local/lib -lsecp256k1
 
+
 # Source files (original 64-bit version)
 CPP_SOURCES = $(SRC_DIR)/main.cpp \
-              $(SRC_DIR)/secp256k1_tiny.cpp \
-              $(SRC_DIR)/bloom_filter.cpp \
-              $(SRC_DIR)/base58.cpp
+			  $(SRC_DIR)/secp256k1_tiny.cpp \
+			  $(SRC_DIR)/bloom_filter.cpp \
+			  $(SRC_DIR)/base58.cpp
 
 # GMP version sources (128-bit+ support - custom EC)
 CPP_SOURCES_GMP = $(SRC_DIR)/main_gmp.cpp \
-                  $(SRC_DIR)/bloom_filter.cpp \
-                  $(SRC_DIR)/base58.cpp
+				  $(SRC_DIR)/bloom_filter.cpp \
+				  $(SRC_DIR)/base58.cpp
 
 # GMP + libsecp256k1 version (SOTA - fastest & most accurate)
 CPP_SOURCES_GMP_SECP = $(SRC_DIR)/main_gmp_secp.cpp \
-                       $(SRC_DIR)/bloom_filter.cpp \
-                       $(SRC_DIR)/base58.cpp
+					   $(SRC_DIR)/bloom_filter.cpp \
+					   $(SRC_DIR)/base58.cpp
 
-CU_SOURCES = $(SRC_DIR)/gpu_kernel.cu
-
-# Object files
-CPP_OBJECTS = $(CPP_SOURCES:.cpp=.o)
-CPP_OBJECTS_GMP = $(CPP_SOURCES_GMP:.cpp=_gmp.o)
-# Object files
-CPP_OBJECTS = $(CPP_SOURCES:.cpp=.o)
-CPP_OBJECTS_GMP = $(CPP_SOURCES_GMP:.cpp=_gmp.o)
-CPP_OBJECTS_GMP_SECP = $(CPP_SOURCES_GMP_SECP:.cpp=_secp.o)
-CU_OBJECTS = $(SRC_DIR)/gpu_secp256k1.o
+# CUDA sources and objects
+CU_SOURCES = $(SRC_DIR)/gpu_kernel.cu $(SRC_DIR)/gpu_secp256k1.cu $(SRC_DIR)/gpu_bsgs.cu
+CU_OBJECTS = $(SRC_DIR)/gpu_kernel.o $(SRC_DIR)/gpu_secp256k1.o $(SRC_DIR)/gpu_bsgs.o
 
 # Default target builds CPU version (SOTA)
 .PHONY: all
@@ -137,6 +131,7 @@ $(TARGET_GPU): $(CU_OBJECTS) $(CPP_OBJECTS_GMP_SECP)
 	@echo "[🚀] GPU VERSION - Massive parallelization on CUDA"
 	@echo "[i] Target: 100M-1B keys/sec on RTX 4090 / A100"
 
+
 # Hybrid GPU+CPU multi-puzzle solver (RECOMMENDED)
 .PHONY: hybrid
 hybrid: check_cuda $(CU_OBJECTS) $(SRC_DIR)/hybrid_gpu_cpu.o
@@ -163,8 +158,13 @@ $(SRC_DIR)/hybrid_gpu_cpu.o: $(SRC_DIR)/hybrid_gpu_cpu.cpp
 	@echo "[+] Compiling hybrid GPU+CPU solver..."
 	$(NVCC) $(NVCCFLAGS) -c $< -o $@
 
-# Compile CUDA kernel
+
+# Compile CUDA kernels
 $(SRC_DIR)/gpu_secp256k1.o: $(SRC_DIR)/gpu_secp256k1.cu
+	@echo "[+] Compiling CUDA kernel: $<..."
+	$(NVCC) $(NVCCFLAGS) -c $< -o $@
+
+$(SRC_DIR)/gpu_bsgs.o: $(SRC_DIR)/gpu_bsgs.cu
 	@echo "[+] Compiling CUDA kernel: $<..."
 	$(NVCC) $(NVCCFLAGS) -c $< -o $@
 
