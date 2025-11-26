@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "gpu_solver.h"
 #include <math.h>
 
 // 256-bit unsigned integer (8 x 32-bit limbs)
