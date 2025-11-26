@@ -245,6 +245,37 @@ void hybrid_solve_puzzle(int puzzle_num, const std::string& start_hex,
                 found = true;
             } else {
                 std::cout << "[-] ⚠️  CPU validation failed (GPU false positive)" << std::endl;
+                // Print candidate private key (hex)
+                std::cout << "    Candidate privkey: ";
+                for (int i = 0; i < 32; i++) std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)found_key[i];
+                std::cout << std::dec << std::endl;
+                // Compute and print computed address and hash160
+                secp256k1_pubkey pubkey;
+                if (secp256k1_ec_pubkey_create(ctx, &pubkey, found_key)) {
+                    uint8_t pubkey_serialized[33];
+                    size_t pubkey_len = 33;
+                    secp256k1_ec_pubkey_serialize(ctx, pubkey_serialized, &pubkey_len, &pubkey, SECP256K1_EC_COMPRESSED);
+                    uint8_t sha_result[32];
+                    SHA256(pubkey_serialized, 33, sha_result);
+                    uint8_t hash160[20];
+                    RIPEMD160(sha_result, 32, hash160);
+                    std::cout << "    Computed hash160: ";
+                    for (int i = 0; i < 20; i++) std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)hash160[i];
+                    std::cout << std::dec << std::endl;
+                    // Base58Check encoding
+                    uint8_t versioned[21];
+                    versioned[0] = 0x00;
+                    memcpy(versioned + 1, hash160, 20);
+                    uint8_t checksum_full[32];
+                    SHA256(versioned, 21, checksum_full);
+                    SHA256(checksum_full, 32, checksum_full);
+                    uint8_t addr_bytes[25];
+                    memcpy(addr_bytes, versioned, 21);
+                    memcpy(addr_bytes + 21, checksum_full, 4);
+                    char computed_address[64];
+                    base58_encode(addr_bytes, 25, computed_address);
+                    std::cout << "    Computed address: " << computed_address << std::endl;
+                }
             }
             mpz_clear(start_mpz);
             mpz_clear(priv_mpz);
@@ -266,11 +297,17 @@ void hybrid_solve_puzzle(int puzzle_num, const std::string& start_hex,
         mpz_sub(total_keys, end_key, start_key);
 
         // Prepare target hash160
-        uint8_t target_hash160[20];
-        // TODO: Extract hash160 from address (use existing address_to_hash160 function)
 
-        // GPU batch size (tune based on VRAM)
-        uint64_t batch_size = 1ULL << 30; // 1 billion keys per batch
+        // Extract hash160 from address
+        uint8_t target_hash160[20];
+        if (!address_to_hash160(address.c_str(), target_hash160)) {
+            std::cerr << "[!] Failed to parse address for hash160: " << address << std::endl;
+            return;
+        }
+
+        // GPU batch size (tune based on VRAM, can be user-tuned)
+        uint64_t batch_size = 1ULL << 30; // 1 billion keys per batch (increase if GPU has more VRAM)
+        // Stride tuning: ensure threads do not overlap and cover full keyspace (see kernel launch config)
 
         uint64_t total_checked = 0;
         auto start_time = std::chrono::steady_clock::now();

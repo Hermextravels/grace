@@ -258,7 +258,6 @@ __global__ void bsgs_giant_steps_kernel(
     // Search in baby table for collision
     for(uint64_t b = 0; b < baby_table_size; b++) {
         if(baby_table[b].hash != hash) continue;
-        
         // Hash matches, check full X coordinate
         bool match = true;
         for(int k = 0; k < 8; k++) {
@@ -267,13 +266,44 @@ __global__ void bsgs_giant_steps_kernel(
                 break;
             }
         }
-        
         if(match) {
-            // COLLISION FOUND!
-            // Private key = i * m + j
-            uint64_t key = i * config->baby_steps + baby_table[b].index;
-            atomicMin((unsigned long long*)found_key, key);
-            return;
+            // COLLISION FOUND! Now check full hash160 of compressed pubkey
+            // Reconstruct ECPoint (X, Y) for pubkey
+            ECPoint pubkey;
+            pubkey.x = giant_point.x;
+            pubkey.y = giant_point.y; // Y is available from scalar_mult
+            pubkey.is_infinity = false;
+
+            // Serialize compressed pubkey (33 bytes): 0x02/0x03 + X
+            uint8_t pubkey_compressed[33];
+            pubkey_compressed[0] = (pubkey.y.v[0] & 1) ? 0x03 : 0x02;
+            for(int i = 0; i < 8; i++) {
+                pubkey_compressed[1 + i*4] = (pubkey.x.v[i] >> 0) & 0xFF;
+                pubkey_compressed[2 + i*4] = (pubkey.x.v[i] >> 8) & 0xFF;
+                pubkey_compressed[3 + i*4] = (pubkey.x.v[i] >> 16) & 0xFF;
+                pubkey_compressed[4 + i*4] = (pubkey.x.v[i] >> 24) & 0xFF;
+            }
+
+            // Device SHA256 and RIPEMD160 implementations required here
+            uint8_t sha256_hash[32];
+            device_sha256(pubkey_compressed, 33, sha256_hash);
+            uint8_t hash160[20];
+            device_ripemd160(sha256_hash, 32, hash160);
+
+            // Compare full hash160
+            bool hash_match = true;
+            for(int h = 0; h < 20; h++) {
+                if(hash160[h] != config->target_hash160[h]) {
+                    hash_match = false;
+                    break;
+                }
+            }
+            if(hash_match) {
+                // Private key = i * m + j
+                uint64_t key = i * config->baby_steps + baby_table[b].index;
+                atomicMin((unsigned long long*)found_key, key);
+                return;
+            }
         }
     }
 }
@@ -318,8 +348,8 @@ int gpu_bsgs_generate_baby_table(
     uint64_t num_steps,
     int bits
 ) {
-    printf("[+] Generating BSGS baby table: %llu entries (~%.2f GB)\n",
-           num_steps, (num_steps * sizeof(BSGSEntry)) / (1024.0*1024.0*1024.0));
+        printf("[+] Generating BSGS baby table: %lu entries (~%.2f GB)\n",
+            (unsigned long)num_steps, (num_steps * sizeof(BSGSEntry)) / (1024.0*1024.0*1024.0));
     
     // Allocate device memory
     BSGSEntry* d_baby_table;
@@ -343,9 +373,9 @@ int gpu_bsgs_generate_baby_table(
         
         cudaDeviceSynchronize();
         
-        printf("\r[+] Baby steps: %llu / %llu (%.1f%%)", 
-               offset + current_batch, num_steps,
-               100.0 * (offset + current_batch) / num_steps);
+         printf("\r[+] Baby steps: %lu / %lu (%.1f%%)", 
+             (unsigned long)(offset + current_batch), (unsigned long)num_steps,
+             100.0 * (offset + current_batch) / num_steps);
         fflush(stdout);
     }
     printf("\n");
@@ -425,9 +455,9 @@ int gpu_bsgs_solve(
     config.giant_steps = config.baby_steps;
     
     printf("[*] BSGS parameters:\n");
-    printf("    - Baby steps: %llu (2^%.1f)\n", 
-           config.baby_steps, log2((double)config.baby_steps));
-    printf("    - Giant steps: %llu\n", config.giant_steps);
+        printf("    - Baby steps: %lu (2^%.1f)\n", 
+            (unsigned long)config.baby_steps, log2((double)config.baby_steps));
+        printf("    - Giant steps: %lu\n", (unsigned long)config.giant_steps);
     printf("    - Memory: ~%.2f GB\n", 
            (config.baby_steps * sizeof(BSGSEntry)) / (1024.0*1024.0*1024.0));
     
@@ -445,7 +475,7 @@ int gpu_bsgs_solve(
         printf("╔══════════════════════════════════════════════════════════════╗\n");
         printf("║                    🎉 KEY FOUND! 🎉                          ║\n");
         printf("╚══════════════════════════════════════════════════════════════╝\n");
-        printf("[+] Private key offset: 0x%llx\n", found_offset);
+        printf("[+] Private key offset: 0x%lx\n", (unsigned long)found_offset);
         if (found_key) *found_key = found_offset;
         cudaFree(baby_table);
         return 0;

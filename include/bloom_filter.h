@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define BLOOM_BITS_PER_ELEMENT 20  // Optimal for ~1% false positive rate
+#define BLOOM_BITS_PER_ELEMENT 24  // Lower false positive rate (more memory)
 
 typedef struct {
     uint8_t* bits;

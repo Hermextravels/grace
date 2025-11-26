@@ -395,14 +395,22 @@ int main(int argc, char** argv) {
         return 1;
     }
     
+
     // Create bloom filter (assume ~1000 targets for sizing)
     printf("[+] Building bloom filter...\n");
     bloom_filter* bloom = bloom_create(num_targets * 2);  // 2x for safety
-    
-    // TODO: Add target hash160s to bloom filter
-    // For now, this is a placeholder - in production you'd parse addresses
-    // and add their hash160 representations to the bloom filter
-    
+
+    // Convert each address to hash160 and add to bloom filter
+    for (int i = 0; i < num_targets; i++) {
+        char* addr = target_addresses[i];
+        uint8_t hash160[20];
+        if (!address_to_hash160(addr, hash160)) {
+            fprintf(stderr, "[!] Failed to parse address: %s\n", addr);
+            continue;
+        }
+        bloom_add(bloom, hash160);
+    }
+
     printf("[+] Bloom filter ready (%.2f MB)\n", bloom_memory_mb(bloom));
     
     // Setup signal handlers
