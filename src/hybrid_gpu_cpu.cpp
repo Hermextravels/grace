@@ -218,99 +218,123 @@ void hybrid_solve_puzzle(int puzzle_num, const std::string& start_hex,
     // Initialize secp256k1 context for CPU validation
     secp256k1_context* ctx = secp256k1_context_create(
         SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
-    
-    // Parse start key
-    mpz_t start_key, end_key, current_key;
-    mpz_init_set_str(start_key, start_hex.c_str(), 16);
-    mpz_init_set_str(end_key, end_hex.c_str(), 16);
-    mpz_init_set(current_key, start_key);
-    
-    // Calculate total keys
-    mpz_t total_keys;
-    mpz_init(total_keys);
-    mpz_sub(total_keys, end_key, start_key);
-    
-    // Prepare target hash160
-    uint8_t target_hash160[20];
-    // TODO: Extract hash160 from address (use existing address_to_hash160 function)
-    
-    // GPU batch size (tune based on VRAM)
-    uint64_t batch_size = 1ULL << 30; // 1 billion keys per batch
-    
-    uint64_t total_checked = 0;
-    auto start_time = std::chrono::steady_clock::now();
-    
-    while (mpz_cmp(current_key, end_key) < 0 && !state->should_stop) {
-        // Export current key to bytes
-        uint8_t start_bytes[32] = {0};
-        size_t count;
-        mpz_export(start_bytes + (32 - ((mpz_sizeinbase(current_key, 2) + 7) / 8)),
-                   &count, 1, 1, 1, 0, current_key);
-        
-        // Determine batch size for this iteration
-        mpz_t remaining;
-        mpz_init(remaining);
-        mpz_sub(remaining, end_key, current_key);
-        
-        uint64_t this_batch = batch_size;
-        if (mpz_cmp_ui(remaining, batch_size) < 0) {
-            this_batch = mpz_get_ui(remaining);
-        }
-        mpz_clear(remaining);
-        
-        std::cout << "[GPU-P" << puzzle_num << "] Batch: " << this_batch << " keys..." << std::flush;
-        
-        // GPU search
-        uint8_t found_key[32];
-        uint8_t found_hash[20];
-        
-        int gpu_result = gpu_search_keys(start_bytes, this_batch, target_hash160, 
-                                         1, found_key, found_hash);
-        
-        if (gpu_result == 1) {
-            std::cout << " GPU HIT! CPU validating..." << std::endl;
-            
-            // CPU validation (libsecp256k1 - 100% accurate)
+
+    // Use BSGS for 71-80 bits, random GPU for 81+
+    unsigned char found_key[32] = {0};
+    bool found = false;
+    if (bits >= 71 && bits <= 80) {
+        // Use BSGS
+        std::cout << "[*] Using GPU-accelerated BSGS for Puzzle #" << puzzle_num << std::endl;
+        int bsgs_result = gpu_bsgs_solve(address.c_str(), start_hex.c_str(), end_hex.c_str(), bits, found_key);
+        if (bsgs_result == 1) {
+            std::cout << "[+] GPU BSGS HIT! CPU validating..." << std::endl;
             if (cpu_validate_key(found_key, address.c_str(), ctx)) {
                 std::cout << "[+] ✅ CPU VALIDATION PASSED - Puzzle #" << puzzle_num << "!" << std::endl;
-                
-                // Save key (append-only)
                 save_found_key(puzzle_num, found_key, address.c_str(), ctx);
-                
-                // Mark this puzzle as found and stop THIS thread only
                 state->found = true;
                 state->should_stop = true;
-                break;
+                found = true;
             } else {
                 std::cout << "[-] ⚠️  CPU validation failed (GPU false positive)" << std::endl;
             }
-        }
-        
-        total_checked += this_batch;
-        
-        // Progress update every 10 batches
-        if (total_checked % (batch_size * 10) == 0) {
-            auto now = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count();
-            if (elapsed > 0) {
-                uint64_t rate = total_checked / elapsed;
-                std::cout << " [P" << puzzle_num << ": " << rate << " keys/s]" << std::endl;
-            }
         } else {
-            std::cout << " ✓" << std::endl;
+            std::cout << "[*] BSGS did not find key in range for Puzzle #" << puzzle_num << std::endl;
         }
-        
-        // Advance to next batch
-        mpz_add_ui(current_key, current_key, this_batch);
+    } else {
+        // Use random GPU search (existing logic)
+        // ...existing code for random GPU search (copy from above)...
+        // Parse start key
+        mpz_t start_key, end_key, current_key;
+        mpz_init_set_str(start_key, start_hex.c_str(), 16);
+        mpz_init_set_str(end_key, end_hex.c_str(), 16);
+        mpz_init_set(current_key, start_key);
+
+        // Calculate total keys
+        mpz_t total_keys;
+        mpz_init(total_keys);
+        mpz_sub(total_keys, end_key, start_key);
+
+        // Prepare target hash160
+        uint8_t target_hash160[20];
+        // TODO: Extract hash160 from address (use existing address_to_hash160 function)
+
+        // GPU batch size (tune based on VRAM)
+        uint64_t batch_size = 1ULL << 30; // 1 billion keys per batch
+
+        uint64_t total_checked = 0;
+        auto start_time = std::chrono::steady_clock::now();
+
+        while (mpz_cmp(current_key, end_key) < 0 && !state->should_stop) {
+            // Export current key to bytes
+            uint8_t start_bytes[32] = {0};
+            size_t count;
+            mpz_export(start_bytes + (32 - ((mpz_sizeinbase(current_key, 2) + 7) / 8)),
+                       &count, 1, 1, 1, 0, current_key);
+
+            // Determine batch size for this iteration
+            mpz_t remaining;
+            mpz_init(remaining);
+            mpz_sub(remaining, end_key, current_key);
+
+            uint64_t this_batch = batch_size;
+            if (mpz_cmp_ui(remaining, batch_size) < 0) {
+                this_batch = mpz_get_ui(remaining);
+            }
+            mpz_clear(remaining);
+
+            std::cout << "[GPU-P" << puzzle_num << "] Batch: " << this_batch << " keys..." << std::flush;
+
+            // GPU search
+            uint8_t found_hash[20];
+
+            int gpu_result = gpu_search_keys(start_bytes, this_batch, target_hash160,
+                                             1, found_key, found_hash);
+
+            if (gpu_result == 1) {
+                std::cout << " GPU HIT! CPU validating..." << std::endl;
+
+                // CPU validation (libsecp256k1 - 100% accurate)
+                if (cpu_validate_key(found_key, address.c_str(), ctx)) {
+                    std::cout << "[+] ✅ CPU VALIDATION PASSED - Puzzle #" << puzzle_num << "!" << std::endl;
+
+                    // Save key (append-only)
+                    save_found_key(puzzle_num, found_key, address.c_str(), ctx);
+
+                    // Mark this puzzle as found and stop THIS thread only
+                    state->found = true;
+                    state->should_stop = true;
+                    found = true;
+                    break;
+                } else {
+                    std::cout << "[-] ⚠️  CPU validation failed (GPU false positive)" << std::endl;
+                }
+            }
+
+            total_checked += this_batch;
+
+            // Progress update every 10 batches
+            if (total_checked % (batch_size * 10) == 0) {
+                auto now = std::chrono::steady_clock::now();
+                auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count();
+                if (elapsed > 0) {
+                    uint64_t rate = total_checked / elapsed;
+                    std::cout << " [P" << puzzle_num << ": " << rate << " keys/s]" << std::endl;
+                }
+            } else {
+                std::cout << " ✓" << std::endl;
+            }
+
+            // Advance to next batch
+            mpz_add_ui(current_key, current_key, this_batch);
+        }
+
+        mpz_clear(start_key);
+        mpz_clear(end_key);
+        mpz_clear(current_key);
+        mpz_clear(total_keys);
     }
-    
-    mpz_clear(start_key);
-    mpz_clear(end_key);
-    mpz_clear(current_key);
-    mpz_clear(total_keys);
     secp256k1_context_destroy(ctx);
-    
-    if (state->found) {
+    if (state->found || found) {
         std::cout << "[+] ✅ Puzzle #" << puzzle_num << " SOLVED!" << std::endl;
     } else if (state->should_stop) {
         std::cout << "[*] Puzzle #" << puzzle_num << " stopped by user" << std::endl;
