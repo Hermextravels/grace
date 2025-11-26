@@ -287,9 +287,9 @@ __global__ void bsgs_giant_steps_kernel(
 
             // Device SHA256 and RIPEMD160 implementations required here
             uint8_t sha256_hash[32];
-            device_sha256(pubkey_compressed, 33, sha256_hash);
+            sha256(sha256_hash, pubkey_compressed, 33);
             uint8_t hash160[20];
-            device_ripemd160(sha256_hash, 32, hash160);
+            ripemd160(hash160, sha256_hash, 32);
 
             // Compare full hash160
             bool hash_match = true;
