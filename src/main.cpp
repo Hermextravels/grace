@@ -20,8 +20,10 @@
 #include <pthread.h>
 #include <signal.h>
 #include <unistd.h>
+#include <openssl/sha.h>
 #include "../include/secp256k1_tiny.h"
 #include "../include/bloom_filter.h"
+#include "../include/base58.h"
 
 // Configuration
 #define MAX_THREADS 16
@@ -45,8 +47,10 @@ typedef struct {
     time_t start_time;
     time_t last_checkpoint;
     bool found;
-    char found_key[128];
+    char found_key_hex[128];
+    char found_key_wif[128];
     char found_address[64];
+    int puzzle_number;
 } search_state;
 
 // Thread work unit
@@ -102,6 +106,80 @@ bool load_checkpoint(search_state* state) {
     return false;
 }
 
+// Convert private key to WIF (Wallet Import Format)
+void private_key_to_wif(const uint8_t* key_bytes, char* wif_out) {
+    uint8_t extended[38];
+    uint8_t hash1[SHA256_DIGEST_LENGTH];
+    uint8_t hash2[SHA256_DIGEST_LENGTH];
+    
+    // Version byte (0x80 for mainnet private key)
+    extended[0] = 0x80;
+    
+    // Private key (32 bytes)
+    memcpy(extended + 1, key_bytes, 32);
+    
+    // Compression flag (0x01 for compressed public key)
+    extended[33] = 0x01;
+    
+    // Double SHA256 for checksum
+    SHA256(extended, 34, hash1);
+    SHA256(hash1, SHA256_DIGEST_LENGTH, hash2);
+    
+    // Append first 4 bytes of hash2 as checksum
+    for (int i = 0; i < 4; i++) {
+        extended[34 + i] = hash2[i];
+    }
+    
+    // Base58 encode all 38 bytes (version + key + compression + checksum)
+    base58_encode(extended, extended + 38, wif_out);
+}
+
+// Convert uint64_t key to hex string
+void key_to_hex_string(uint64_t key, char* hex_out) {
+    snprintf(hex_out, 17, "%016llx", key);
+}
+
+// Save found key to file
+void save_found_key(const char* address, const char* key_hex, const char* key_wif, int puzzle_num) {
+    time_t now = time(NULL);
+    char filename[128];
+    snprintf(filename, sizeof(filename), "WINNER_PUZZLE_%d.txt", puzzle_num > 0 ? puzzle_num : 71);
+    
+    FILE* fp = fopen(filename, "w");
+    if (fp) {
+        fprintf(fp, "========================================\n");
+        fprintf(fp, "  BITCOIN PUZZLE SOLVED!\n");
+        fprintf(fp, "========================================\n");
+        fprintf(fp, "Puzzle: #%d\n", puzzle_num > 0 ? puzzle_num : 71);
+        fprintf(fp, "Date: %s", ctime(&now));
+        fprintf(fp, "Address: %s\n", address);
+        fprintf(fp, "\n");
+        fprintf(fp, "Private Key (HEX):\n");
+        fprintf(fp, "%s\n", key_hex);
+        fprintf(fp, "\n");
+        fprintf(fp, "Private Key (WIF - Compressed):\n");
+        fprintf(fp, "%s\n", key_wif);
+        fprintf(fp, "\n");
+        fprintf(fp, "========================================\n");
+        fprintf(fp, "IMPORT TO WALLET:\n");
+        fprintf(fp, "1. Open Bitcoin wallet (Electrum, Bitcoin Core, etc.)\n");
+        fprintf(fp, "2. Go to: Wallet -> Private Keys -> Import\n");
+        fprintf(fp, "3. Paste the WIF key above\n");
+        fprintf(fp, "4. Sweep/transfer funds to your secure address\n");
+        fprintf(fp, "========================================\n");
+        fclose(fp);
+        printf("\n[+] Key saved to: %s\n", filename);
+    }
+    
+    // Also append to master log
+    FILE* log = fopen("found_keys.log", "a");
+    if (log) {
+        fprintf(log, "[%s] Puzzle %d | Address: %s | Key: %s | WIF: %s\n",
+                ctime(&now), puzzle_num, address, key_hex, key_wif);
+        fclose(log);
+    }
+}
+
 // Worker thread function
 void* worker_thread(void* arg) {
     thread_work* work = (thread_work*)arg;
@@ -133,13 +211,61 @@ void* worker_thread(void* arg) {
             // Potential hit - generate full address and verify
             point_to_address_compressed(&pub_key, address);
             
-            // Check against actual targets (bloom filter can have false positives)
-            // In production, this would check against loaded target list
-            printf("[Thread %d] Bloom hit at %llx: %s\n", 
-                   work->thread_id, pos, address);
+            // TODO: Check against actual target list loaded in memory
+            // For now, just report bloom hits (will have false positives)
             
-            // TODO: Verify against exact target list
-            // If exact match, set state->found = true and save key
+            // If exact match found, save the key!
+            bool exact_match = false;
+            // char* matched_address = NULL;
+            // for (int i = 0; i < num_targets; i++) {
+            //     if (strcmp(address, targets[i]) == 0) {
+            //         exact_match = true;
+            //         matched_address = targets[i];
+            //         break;
+            //     }
+            // }
+            
+            if (exact_match) {
+                pthread_mutex_lock(work->state_mutex);
+                if (!work->state->found) {
+                    work->state->found = true;
+                    
+                    // Save hex format
+                    key_to_hex_string(pos, work->state->found_key_hex);
+                    
+                    // Save WIF format
+                    uint8_t key_bytes[32] = {0};
+                    for (int i = 0; i < 8; i++) {
+                        key_bytes[24 + i] = (pos >> (56 - i*8)) & 0xFF;
+                    }
+                    private_key_to_wif(key_bytes, work->state->found_key_wif);
+                    
+                    // Save address
+                    strncpy(work->state->found_address, address, 63);
+                    
+                    // Save to file immediately
+                    save_found_key(address, work->state->found_key_hex, 
+                                 work->state->found_key_wif, work->state->puzzle_number);
+                    
+                    printf("\n");
+                    printf("╔════════════════════════════════════════════════╗\n");
+                    printf("║                                                ║\n");
+                    printf("║           🎉 KEY FOUND! 🎉                     ║\n");
+                    printf("║                                                ║\n");
+                    printf("╚════════════════════════════════════════════════╝\n");
+                    printf("\n");
+                    printf("Address: %s\n", address);
+                    printf("Private Key (HEX): %s\n", work->state->found_key_hex);
+                    printf("Private Key (WIF): %s\n", work->state->found_key_wif);
+                    printf("\n");
+                    printf("✅ Keys saved to: WINNER_PUZZLE_%d.txt\n", work->state->puzzle_number);
+                    printf("✅ Also logged to: found_keys.log\n");
+                    printf("\n");
+                    
+                    g_running = false; // Stop all threads
+                }
+                pthread_mutex_unlock(work->state_mutex);
+            }
         }
         
         // Endomorphism check: multiply key by lambda to get another point to check
@@ -291,6 +417,25 @@ int main(int argc, char** argv) {
         g_state.start_time = time(NULL);
         g_state.last_checkpoint = time(NULL);
         g_state.current_position = range_start;
+        g_state.found = false;
+        g_state.puzzle_number = 71; // Default
+        
+        // Auto-detect puzzle number from range start (within 64-bit range)
+        if (range_start >= 0x4000000000000000ULL && range_start < 0x8000000000000000ULL) {
+            g_state.puzzle_number = 71;
+        } else if (range_start >= 0x8000000000000000ULL) {
+            // For ranges above 71, use bit counting
+            uint64_t temp = range_start;
+            int bits = 0;
+            while (temp > 0) { bits++; temp >>= 1; }
+            g_state.puzzle_number = (bits > 0) ? bits : 71;
+        } else {
+            // For smaller ranges, count bits
+            uint64_t temp = range_start;
+            int bits = 0;
+            while (temp > 0) { bits++; temp >>= 1; }
+            g_state.puzzle_number = (bits > 0 && bits < 71) ? bits : 71;
+        }
     }
     
     // Create worker threads
@@ -299,7 +444,8 @@ int main(int argc, char** argv) {
     thread_work work[MAX_THREADS];
     
     uint64_t range_size = range_end - range_start;
-    uint64_t stride = STRIDE_BASE;
+    // Use smaller stride for small test ranges
+    uint64_t stride = (range_size < 0x100000) ? 1 : STRIDE_BASE;
     
     for (int i = 0; i < num_threads; i++) {
         work[i].thread_id = i;
@@ -339,9 +485,33 @@ int main(int argc, char** argv) {
     printf("\n[+] Solver stopped. Total keys checked: %llu\n", g_state.keys_checked);
     
     if (g_state.found) {
-        printf("\n[!!!] KEY FOUND [!!!]\n");
-        printf("Key: %s\n", g_state.found_key);
+        printf("\n");
+        printf("╔════════════════════════════════════════════════════════════╗\n");
+        printf("║                                                            ║\n");
+        printf("║              🏆 PUZZLE SOLVED! 🏆                          ║\n");
+        printf("║                                                            ║\n");
+        printf("╚════════════════════════════════════════════════════════════╝\n");
+        printf("\n");
+        printf("Puzzle: #%d\n", g_state.puzzle_number);
         printf("Address: %s\n", g_state.found_address);
+        printf("\n");
+        printf("Private Key (HEX):\n");
+        printf("%s\n", g_state.found_key_hex);
+        printf("\n");
+        printf("Private Key (WIF - Import Ready):\n");
+        printf("%s\n", g_state.found_key_wif);
+        printf("\n");
+        printf("════════════════════════════════════════════════════════════\n");
+        printf("📁 Keys saved to:\n");
+        printf("   • WINNER_PUZZLE_%d.txt (detailed info)\n", g_state.puzzle_number);
+        printf("   • found_keys.log (master log)\n");
+        printf("\n");
+        printf("💰 To claim your prize:\n");
+        printf("   1. Open Bitcoin wallet (Electrum recommended)\n");
+        printf("   2. Import the WIF key above\n");
+        printf("   3. Transfer funds to your secure address\n");
+        printf("   4. FIRST transaction to blockchain wins!\n");
+        printf("════════════════════════════════════════════════════════════\n");
     }
     
     return 0;

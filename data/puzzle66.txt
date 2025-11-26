@@ -1,0 +1,5 @@
+# Bitcoin Puzzle #66 (SOLVED - for testing)
+# Private key: 0x2832ed74f2b5e35ee
+# Address: 13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so
+
+13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so

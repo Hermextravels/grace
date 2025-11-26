@@ -1,0 +1,6 @@
+# Bitcoin Puzzle #71 - Target Address
+# Range: 0x400000000000000000 to 0x7fffffffffffffffff (71 bits)
+# Status: UNSOLVED - Prize: ~0.71 BTC
+# Address generated from unknown private key in this range
+
+1Fo65aKq8s8iquMt6weF1rku1moWVEd5Ua

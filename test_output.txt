@@ -1,0 +1,35 @@
+=== Hybrid Bitcoin Puzzle Solver ===
+Optimizations: Bloom filter, Endomorphism, Multi-threaded, Checkpointing
+
+[+] Range: 9d18b63ac0000 to 9d18b63ad0000
+[+] Threads: 8
+[+] Loaded 1 target addresses
+[+] Building bloom filter...
+[Bloom] Created filter: 40 bits (0.00 MB), 13 hash functions
+[+] Bloom filter ready (0.00 MB)
+[+] Checkpoint loaded: 1 keys checked, position: 80000000000000
+[+] Resuming from checkpoint
+[Thread 0] Starting from 80000000000000, stride 1000000000
+[Thread 0] Finished, checked 0 keys
+[Thread 1] Starting from 8000003b9aca00, stride 1000000000
+[Thread 1] Finished, checked 0 keys
+[Thread 2] Starting from 80000077359400, stride 1000000000
+[Thread 2] Finished, checked 0 keys
+[Thread 3] Starting from 800000b2d05e00, stride 1000000000
+[Thread 3] Finished, checked 0 keys
+[Thread 4] Starting from 800000ee6b2800, stride 1000000000
+[Thread 4] Finished, checked 0 keys
+[Thread 5] Starting from 8000012a05f200, stride 1000000000
+[Thread 5] Finished, checked 0 keys
+[Thread 6] Starting from 80000165a0bc00, stride 1000000000
+[Thread 6] Finished, checked 0 keys
+[Thread 7] Starting from 800001a13b8600, stride 1000000000
+[Thread 7] Finished, checked 0 keys
+
+[*] Solver running... Press Ctrl+C to stop
+
+[*] Progress: 1 keys | 0.00 MKeys/s | Elapsed: 248s | Pos: 80000000000000
+[+] Checkpoint saved: 1 keys checked, position: 80000000000000
+[+] Checkpoint saved: 1 keys checked, position: 80000000000000
+
+[+] Solver stopped. Total keys checked: 1
