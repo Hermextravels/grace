@@ -51,18 +51,21 @@ SECP256K1_LIBS = -L/usr/local/lib -lsecp256k1
 CPP_SOURCES = $(SRC_DIR)/main.cpp \
 			  $(SRC_DIR)/secp256k1_tiny.cpp \
 			  $(SRC_DIR)/bloom_filter.cpp \
-			  $(SRC_DIR)/base58.cpp
+			  $(SRC_DIR)/base58.cpp \
+			  $(SRC_DIR)/address_utils.cpp
 
 # GMP version sources (128-bit+ support - custom EC)
 CPP_SOURCES_GMP = $(SRC_DIR)/main_gmp.cpp \
 				  $(SRC_DIR)/bloom_filter.cpp \
-				  $(SRC_DIR)/base58.cpp
+				  $(SRC_DIR)/base58.cpp \
+				  $(SRC_DIR)/address_utils.cpp
 
 
 # GMP + libsecp256k1 version (SOTA - fastest & most accurate)
 CPP_SOURCES_GMP_SECP = $(SRC_DIR)/main_gmp_secp.cpp \
 				   $(SRC_DIR)/bloom_filter.cpp \
-				   $(SRC_DIR)/base58.cpp
+				   $(SRC_DIR)/base58.cpp \
+				   $(SRC_DIR)/address_utils.cpp
 
 # Object files for SOTA version (GMP + secp256k1)
 CPP_OBJECTS_GMP_SECP = $(SRC_DIR)/main_gmp_secp.o $(SRC_DIR)/bloom_filter.o $(SRC_DIR)/base58.o
@@ -137,9 +140,9 @@ else
 	@echo "[i] Building for GPU architectures: SM 75, 80, 86, 89, 90"
 endif
 
-$(TARGET_GPU): $(CU_OBJECTS) $(CPP_OBJECTS_GMP_SECP)
+$(TARGET_GPU): $(CU_OBJECTS) $(CPP_OBJECTS_GMP_SECP) $(SRC_DIR)/address_utils.o
 	@echo "[+] Linking $(TARGET_GPU) with CUDA support..."
-	$(NVCC) $(NVCCFLAGS) $(CU_OBJECTS) $(CPP_OBJECTS_GMP_SECP) -o $(TARGET_GPU) \
+	$(NVCC) $(NVCCFLAGS) $(CU_OBJECTS) $(CPP_OBJECTS_GMP_SECP) $(SRC_DIR)/address_utils.o -o $(TARGET_GPU) \
 		-Xcompiler -pthread $(GMP_LIBS) $(SECP256K1_LIBS) $(CUDA_LDFLAGS) $(OPENSSL_LIBS)
 	@echo "[+] Build complete: ./$(TARGET_GPU)"
 	@echo "[🚀] GPU VERSION - Massive parallelization on CUDA"
@@ -148,9 +151,9 @@ $(TARGET_GPU): $(CU_OBJECTS) $(CPP_OBJECTS_GMP_SECP)
 
 # Hybrid GPU+CPU multi-puzzle solver (RECOMMENDED)
 .PHONY: hybrid
-hybrid: check_cuda $(CU_OBJECTS) $(SRC_DIR)/hybrid_gpu_cpu.o
+hybrid: check_cuda $(CU_OBJECTS) $(SRC_DIR)/hybrid_gpu_cpu.o $(SRC_DIR)/address_utils.o
 	@echo "[+] Linking Hybrid GPU+CPU multi-puzzle solver..."
-	$(NVCC) $(NVCCFLAGS) $(CU_OBJECTS) $(SRC_DIR)/hybrid_gpu_cpu.o -o hybrid_multi_solver \
+	$(NVCC) $(NVCCFLAGS) $(CU_OBJECTS) $(SRC_DIR)/hybrid_gpu_cpu.o $(SRC_DIR)/address_utils.o -o hybrid_multi_solver \
 		-Xcompiler -pthread $(GMP_LIBS) $(SECP256K1_LIBS) $(CUDA_LDFLAGS) $(OPENSSL_LIBS)
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
