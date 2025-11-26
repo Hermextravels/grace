@@ -58,10 +58,24 @@ CPP_SOURCES_GMP = $(SRC_DIR)/main_gmp.cpp \
 				  $(SRC_DIR)/bloom_filter.cpp \
 				  $(SRC_DIR)/base58.cpp
 
+
 # GMP + libsecp256k1 version (SOTA - fastest & most accurate)
 CPP_SOURCES_GMP_SECP = $(SRC_DIR)/main_gmp_secp.cpp \
-					   $(SRC_DIR)/bloom_filter.cpp \
-					   $(SRC_DIR)/base58.cpp
+				   $(SRC_DIR)/bloom_filter.cpp \
+				   $(SRC_DIR)/base58.cpp
+
+# Object files for SOTA version (GMP + secp256k1)
+CPP_OBJECTS_GMP_SECP = $(SRC_DIR)/main_gmp_secp.o $(SRC_DIR)/bloom_filter.o $(SRC_DIR)/base58.o
+
+# Build object files for SOTA version
+$(SRC_DIR)/main_gmp_secp.o: $(SRC_DIR)/main_gmp_secp.cpp
+	$(CXX) $(CXXFLAGS) $(GMP_FLAGS) $(SECP256K1_FLAGS) -c $< -o $@
+
+$(SRC_DIR)/bloom_filter.o: $(SRC_DIR)/bloom_filter.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(SRC_DIR)/base58.o: $(SRC_DIR)/base58.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # CUDA sources and objects
 CU_SOURCES = $(SRC_DIR)/gpu_secp256k1.cu $(SRC_DIR)/gpu_bsgs.cu
