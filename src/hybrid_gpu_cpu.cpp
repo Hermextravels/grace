@@ -34,7 +34,7 @@
 #include <openssl/ripemd.h>
 
 #include "gpu_solver.h"
-#include "gpu_bsgs.h"
+#include "../include/gpu_bsgs.h"
 #include "../include/bloom_filter.h"
 
 // Thread-safe result storage
