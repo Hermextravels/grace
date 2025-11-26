@@ -64,8 +64,8 @@ CPP_SOURCES_GMP_SECP = $(SRC_DIR)/main_gmp_secp.cpp \
 					   $(SRC_DIR)/base58.cpp
 
 # CUDA sources and objects
-CU_SOURCES = $(SRC_DIR)/gpu_kernel.cu $(SRC_DIR)/gpu_secp256k1.cu $(SRC_DIR)/gpu_bsgs.cu
-CU_OBJECTS = $(SRC_DIR)/gpu_kernel.o $(SRC_DIR)/gpu_secp256k1.o $(SRC_DIR)/gpu_bsgs.o
+CU_SOURCES = $(SRC_DIR)/gpu_secp256k1.cu $(SRC_DIR)/gpu_bsgs.cu
+CU_OBJECTS = $(SRC_DIR)/gpu_secp256k1.o $(SRC_DIR)/gpu_bsgs.o
 
 # Default target builds CPU version (SOTA)
 .PHONY: all
