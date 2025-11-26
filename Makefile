@@ -43,8 +43,8 @@ GMP_FLAGS = $(shell pkg-config --cflags gmp 2>/dev/null || echo "")
 GMP_LIBS = $(shell pkg-config --libs gmp 2>/dev/null || echo "-lgmp")
 
 # libsecp256k1 (Bitcoin Core's official EC library)
-SECP256K1_FLAGS = -I/usr/local/Cellar/secp256k1/0.7.0/include
-SECP256K1_LIBS = -L/usr/local/Cellar/secp256k1/0.7.0/lib -lsecp256k1
+SECP256K1_FLAGS = -I/usr/local/include
+SECP256K1_LIBS = -L/usr/local/lib -lsecp256k1
 
 # Source files (original 64-bit version)
 CPP_SOURCES = $(SRC_DIR)/main.cpp \
@@ -132,7 +132,7 @@ endif
 $(TARGET_GPU): $(CU_OBJECTS) $(CPP_OBJECTS_GMP_SECP)
 	@echo "[+] Linking $(TARGET_GPU) with CUDA support..."
 	$(NVCC) $(NVCCFLAGS) $(CU_OBJECTS) $(CPP_OBJECTS_GMP_SECP) -o $(TARGET_GPU) \
-		$(LDFLAGS) $(GMP_LIBS) $(SECP256K1_LIBS) $(CUDA_LDFLAGS)
+		-Xcompiler -pthread $(GMP_LIBS) $(SECP256K1_LIBS) $(CUDA_LDFLAGS) $(OPENSSL_LIBS)
 	@echo "[+] Build complete: ./$(TARGET_GPU)"
 	@echo "[🚀] GPU VERSION - Massive parallelization on CUDA"
 	@echo "[i] Target: 100M-1B keys/sec on RTX 4090 / A100"
@@ -142,7 +142,7 @@ $(TARGET_GPU): $(CU_OBJECTS) $(CPP_OBJECTS_GMP_SECP)
 hybrid: check_cuda $(CU_OBJECTS) $(SRC_DIR)/hybrid_gpu_cpu.o
 	@echo "[+] Linking Hybrid GPU+CPU multi-puzzle solver..."
 	$(NVCC) $(NVCCFLAGS) $(CU_OBJECTS) $(SRC_DIR)/hybrid_gpu_cpu.o -o hybrid_multi_solver \
-		$(LDFLAGS) $(GMP_LIBS) $(SECP256K1_LIBS) $(CUDA_LDFLAGS)
+		-Xcompiler -pthread $(GMP_LIBS) $(SECP256K1_LIBS) $(CUDA_LDFLAGS) $(OPENSSL_LIBS)
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
 	@echo "║  ✅ Hybrid GPU+CPU Solver Ready: ./hybrid_multi_solver      ║"

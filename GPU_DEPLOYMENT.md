@@ -33,7 +33,18 @@ cd secp256k1
 ./configure --enable-module-recovery
 make
 sudo make install
+
+# CRITICAL: Update library cache (Linux)
 sudo ldconfig
+
+# If ldconfig doesn't work, manually add library path:
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+echo 'export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+source ~/.bashrc
+
+# Verify installation
+ldconfig -p | grep secp256k1
+ls -la /usr/local/lib/libsecp256k1*
 ```
 
 ## 🚀 Build Instructions
