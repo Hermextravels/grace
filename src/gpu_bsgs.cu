@@ -40,11 +40,12 @@ struct BSGSEntry {
     uint32_t hash;          // Hash for faster lookup
 };
 
-// Constant memory for secp256k1 curve parameters
-__constant__ uint256_t c_p;         // Prime modulus
-__constant__ uint256_t c_n;         // Curve order
-__constant__ uint256_t c_gx;        // Generator X
-__constant__ uint256_t c_gy;        // Generator Y
+
+// Use secp256k1 constants from gpu_secp256k1.cu
+extern __device__ __constant__ uint256_t SECP256K1_P;    // Field prime
+extern __device__ __constant__ uint256_t SECP256K1_N;    // Curve order
+extern __device__ __constant__ uint256_t SECP256K1_Gx;   // Generator x
+extern __device__ __constant__ uint256_t SECP256K1_Gy;   // Generator y
 
 // BSGS configuration
 struct BSGSConfig {
@@ -160,8 +161,8 @@ __device__ void point_add(ECPoint* result, const ECPoint* p, const ECPoint* q) {
 // Scalar multiplication: k * G
 __device__ void scalar_mult(ECPoint* result, const uint256_t* k) {
     ECPoint Q, G;
-    G.x = c_gx;
-    G.y = c_gy;
+    G.x = SECP256K1_Gx;
+    G.y = SECP256K1_Gy;
     G.is_infinity = false;
     
     Q.is_infinity = true;
