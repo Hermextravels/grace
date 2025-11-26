@@ -1,0 +1,3 @@
+# Test CSV for Puzzle 66 (known solution)
+# Format: puzzle_number,bits,start_hex,end_hex,address,btc_prize
+66,66,1000000000000000,1fffffffffffffff,13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so,0.01
