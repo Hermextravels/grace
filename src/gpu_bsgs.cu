@@ -381,7 +381,7 @@ int gpu_bsgs_giant_steps(
     bsgs_giant_steps_kernel<<<blocks, threads>>>(
         baby_table,
         baby_table_size,
-        d_found_key,
+        d_found_offset,
         d_config,
         0,
         num_giant_steps
@@ -438,13 +438,14 @@ int gpu_bsgs_solve(
     }
     
     // Run giant steps
-        if(gpu_bsgs_giant_steps(baby_table, config.baby_steps, &config, &found_offset) == 0) {
+    uint64_t found_offset = UINT64_MAX;
+    if(gpu_bsgs_giant_steps(baby_table, config.baby_steps, &config, &found_offset) == 0) {
         printf("\n");
         printf("╔══════════════════════════════════════════════════════════════╗\n");
         printf("║                    🎉 KEY FOUND! 🎉                          ║\n");
         printf("╚══════════════════════════════════════════════════════════════╝\n");
-        printf("[+] Private key: 0x%llx\n", *found_key);
-        
+        printf("[+] Private key offset: 0x%llx\n", found_offset);
+        if (found_key) *found_key = found_offset;
         cudaFree(baby_table);
         return 0;
     }
