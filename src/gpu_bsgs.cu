@@ -358,15 +358,15 @@ int gpu_bsgs_giant_steps(
     const BSGSEntry* baby_table,
     uint64_t baby_table_size,
     const BSGSConfig* config,
-    uint64_t* found_key
+    uint64_t* found_offset
 ) {
     printf("[+] Running BSGS giant steps...\n");
     
     // Allocate device memory for result
-    uint64_t* d_found_key;
-    cudaMalloc(&d_found_key, sizeof(uint64_t));
+    uint64_t* d_found_offset;
+    cudaMalloc(&d_found_offset, sizeof(uint64_t));
     uint64_t init_val = UINT64_MAX;
-    cudaMemcpy(d_found_key, &init_val, sizeof(uint64_t), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_found_offset, &init_val, sizeof(uint64_t), cudaMemcpyHostToDevice);
     
     // Copy config to device
     BSGSConfig* d_config;
@@ -390,12 +390,12 @@ int gpu_bsgs_giant_steps(
     cudaDeviceSynchronize();
     
     // Check result
-    cudaMemcpy(found_key, d_found_key, sizeof(uint64_t), cudaMemcpyDeviceToHost);
+    cudaMemcpy(found_offset, d_found_offset, sizeof(uint64_t), cudaMemcpyDeviceToHost);
     
-    cudaFree(d_found_key);
+    cudaFree(d_found_offset);
     cudaFree(d_config);
     
-    return (*found_key != UINT64_MAX) ? 0 : -1;
+    return (*found_offset != UINT64_MAX) ? 0 : -1;
 }
 
 // Main BSGS solver entry point
@@ -438,7 +438,7 @@ int gpu_bsgs_solve(
     }
     
     // Run giant steps
-    if(gpu_bsgs_giant_steps(baby_table, config.baby_steps, &config, found_key) == 0) {
+        if(gpu_bsgs_giant_steps(baby_table, config.baby_steps, &config, &found_offset) == 0) {
         printf("\n");
         printf("╔══════════════════════════════════════════════════════════════╗\n");
         printf("║                    🎉 KEY FOUND! 🎉                          ║\n");

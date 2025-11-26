@@ -221,13 +221,21 @@ void hybrid_solve_puzzle(int puzzle_num, const std::string& start_hex,
         SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
 
     // Use BSGS for 71-80 bits, random GPU for 81+
-    unsigned char found_key[32] = {0};
     bool found = false;
     if (bits >= 71 && bits <= 80) {
-        // Use BSGS
+        // Use BSGS (offset-based)
         std::cout << "[*] Using GPU-accelerated BSGS for Puzzle #" << puzzle_num << std::endl;
-        int bsgs_result = gpu_bsgs_solve(address.c_str(), start_hex.c_str(), end_hex.c_str(), bits, found_key);
-        if (bsgs_result == 1) {
+        uint64_t found_offset = 0;
+        int bsgs_result = gpu_bsgs_solve(address.c_str(), start_hex.c_str(), end_hex.c_str(), bits, &found_offset);
+        if (bsgs_result == 0) {
+            // Reconstruct full key: priv = start + offset
+            mpz_t start_mpz, priv_mpz;
+            mpz_init_set_str(start_mpz, start_hex.c_str(), 16);
+            mpz_init(priv_mpz);
+            mpz_add_ui(priv_mpz, start_mpz, found_offset);
+            unsigned char found_key[32] = {0};
+            size_t count = 0;
+            mpz_export(found_key + (32 - ((mpz_sizeinbase(priv_mpz, 2) + 7) / 8)), &count, 1, 1, 1, 0, priv_mpz);
             std::cout << "[+] GPU BSGS HIT! CPU validating..." << std::endl;
             if (cpu_validate_key(found_key, address.c_str(), ctx)) {
                 std::cout << "[+] ✅ CPU VALIDATION PASSED - Puzzle #" << puzzle_num << "!" << std::endl;
@@ -238,6 +246,8 @@ void hybrid_solve_puzzle(int puzzle_num, const std::string& start_hex,
             } else {
                 std::cout << "[-] ⚠️  CPU validation failed (GPU false positive)" << std::endl;
             }
+            mpz_clear(start_mpz);
+            mpz_clear(priv_mpz);
         } else {
             std::cout << "[*] BSGS did not find key in range for Puzzle #" << puzzle_num << std::endl;
         }
