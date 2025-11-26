@@ -36,6 +36,7 @@
 #include "gpu_solver.h"
 #include "../include/gpu_bsgs.h"
 #include "../include/bloom_filter.h"
+#include "../include/address_utils.h"
 
 // Thread-safe result storage
 std::mutex result_mutex;

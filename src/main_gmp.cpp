@@ -28,6 +28,7 @@
 #include <openssl/ripemd.h>
 #include "../include/bloom_filter.h"
 #include "../include/base58.h"
+#include "../include/address_utils.h"
 
 // Configuration
 #define MAX_THREADS 32
